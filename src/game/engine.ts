@@ -1,7 +1,8 @@
 import type { Ending, GameEvent, Stats } from './types'
 import { EVENTS } from './events'
 import { DISRUPTION_EVENTS, EXIT_EVENTS } from './disruptions'
-import { RANKS, PROMOTION_LINES, MAX_EVENTS, DISRUPTION_CHANCE } from './ranks'
+import { NEMESIS_EVENTS } from './nemesis'
+import { RANKS, PROMOTION_LINES, MAX_EVENTS, DISRUPTION_CHANCE, EFFECT_MULTIPLIER } from './ranks'
 
 export interface GameState {
   stats: Stats
@@ -9,10 +10,12 @@ export interface GameState {
   eventsSinceLastPromotion: number
   eventsPlayed: number
   usedEventIds: string[]
+  flags: string[]
   currentEvent: GameEvent
   banner: string | null
   ending: Ending | null
   lastChoiceResult: string | null
+  lastDeltas: Partial<Stats>
 }
 
 const INITIAL_STATS: Stats = { sanity: 50, uptime: 50, reputation: 50, karma: 50 }
@@ -24,8 +27,36 @@ const FIRED_REASONS: Record<keyof Stats, string> = {
   karma: 'Enough people complained about you in enough 1:1s. It finally caught up with you.',
 }
 
+export const STAT_CONTEXT: Record<keyof Stats, { critical: string; strained: string }> = {
+  sanity: {
+    strained: 'You are one bad standup away from crying in a supply closet.',
+    critical: 'You have started narrating your own life in the third person. Not a good sign.',
+  },
+  uptime: {
+    strained: 'Customers are starting to notice. So is the status page.',
+    critical: 'The outage has its own Slack channel, its own bot, and its own inside jokes.',
+  },
+  reputation: {
+    strained: 'People are reviewing your PRs "when they get a chance."',
+    critical: 'Your name is now a verb, and not the good kind.',
+  },
+  karma: {
+    strained: 'Two people have started a shared doc about you. You have not seen it.',
+    critical: 'HR has your name saved as a contact.',
+  },
+}
+
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, n))
+}
+
+function scaledEffects(effects: Partial<Stats>): Partial<Stats> {
+  const scaled: Partial<Stats> = {}
+  for (const key of Object.keys(effects) as (keyof Stats)[]) {
+    const v = effects[key]
+    if (v !== undefined) scaled[key] = Math.round(v * EFFECT_MULTIPLIER)
+  }
+  return scaled
 }
 
 function applyEffects(stats: Stats, effects: Partial<Stats>): Stats {
@@ -49,9 +80,13 @@ function pickFrom(pool: GameEvent[]): GameEvent {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-function eligiblePool(rankIndex: number, usedIds: string[]): GameEvent[] {
-  const inBand = EVENTS.filter(
-    (e) => e.minRank <= rankIndex && (e.maxRank ?? 5) >= rankIndex
+function eligiblePool(rankIndex: number, usedIds: string[], flags: string[]): GameEvent[] {
+  const allSources = [...EVENTS, ...NEMESIS_EVENTS]
+  const inBand = allSources.filter(
+    (e) =>
+      e.minRank <= rankIndex &&
+      (e.maxRank ?? 5) >= rankIndex &&
+      (!e.requiresFlag || flags.includes(e.requiresFlag))
   )
   const unused = inBand.filter((e) => !usedIds.includes(e.id))
   return unused.length > 0 ? unused : inBand
@@ -69,6 +104,11 @@ function avgStat(stats: Stats): number {
   return (stats.sanity + stats.uptime + stats.reputation + stats.karma) / 4
 }
 
+function withFlag(flags: string[], event: GameEvent): string[] {
+  if (!event.setFlag || flags.includes(event.setFlag)) return flags
+  return [...flags, event.setFlag]
+}
+
 export function newGame(): GameState {
   return {
     stats: INITIAL_STATS,
@@ -76,10 +116,12 @@ export function newGame(): GameState {
     eventsSinceLastPromotion: 0,
     eventsPlayed: 0,
     usedEventIds: [],
-    currentEvent: pickFrom(eligiblePool(0, [])),
+    flags: [],
+    currentEvent: pickFrom(eligiblePool(0, [], [])),
     banner: null,
     ending: null,
     lastChoiceResult: null,
+    lastDeltas: {},
   }
 }
 
@@ -95,6 +137,7 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     return {
       ...state,
       lastChoiceResult: choice.result,
+      lastDeltas: {},
       ending: {
         kind: 'retired',
         headline: 'EARLY RETIREMENT',
@@ -103,8 +146,10 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     }
   }
 
-  const newStats = applyEffects(state.stats, choice.effects)
+  const effects = scaledEffects(choice.effects)
+  const newStats = applyEffects(state.stats, effects)
   const usedIds = [...state.usedEventIds, state.currentEvent.id]
+  const flags = withFlag(state.flags, state.currentEvent)
   const eventsPlayed = state.eventsPlayed + 1
 
   const firedStat = findFiredStat(newStats)
@@ -112,8 +157,10 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     return {
       ...state,
       lastChoiceResult: choice.result,
+      lastDeltas: effects,
       stats: newStats,
       usedEventIds: usedIds,
+      flags,
       eventsPlayed,
       ending: {
         kind: 'fired',
@@ -128,8 +175,10 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     return {
       ...state,
       lastChoiceResult: choice.result,
+      lastDeltas: effects,
       stats: newStats,
       usedEventIds: usedIds,
+      flags,
       eventsPlayed,
       ending: good
         ? {
@@ -156,8 +205,10 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
         return {
           ...state,
           lastChoiceResult: choice.result,
+          lastDeltas: effects,
           stats: newStats,
           usedEventIds: usedIds,
+          flags,
           eventsPlayed,
           eventsSinceLastPromotion: 0,
           currentEvent: pickFrom(exits),
@@ -167,11 +218,13 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       return {
         ...state,
         lastChoiceResult: choice.result,
+        lastDeltas: effects,
         stats: newStats,
         usedEventIds: usedIds,
+        flags,
         eventsPlayed,
         eventsSinceLastPromotion: 0,
-        currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds)),
+        currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds, flags)),
         banner: null,
       }
     }
@@ -181,8 +234,10 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       return {
         ...state,
         lastChoiceResult: choice.result,
+        lastDeltas: effects,
         stats: newStats,
         usedEventIds: usedIds,
+        flags,
         eventsPlayed,
         eventsSinceLastPromotion: 0,
         currentEvent: pickFrom(disruptions),
@@ -194,12 +249,14 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     return {
       ...state,
       lastChoiceResult: choice.result,
+      lastDeltas: effects,
       stats: newStats,
       usedEventIds: usedIds,
+      flags,
       eventsPlayed,
       rankIndex: newRankIndex,
       eventsSinceLastPromotion: 0,
-      currentEvent: pickFrom(eligiblePool(newRankIndex, usedIds)),
+      currentEvent: pickFrom(eligiblePool(newRankIndex, usedIds, flags)),
       banner: PROMOTION_LINES[newRankIndex - 1] ?? null,
     }
   }
@@ -207,11 +264,13 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
   return {
     ...state,
     lastChoiceResult: choice.result,
+    lastDeltas: effects,
     stats: newStats,
     usedEventIds: usedIds,
+    flags,
     eventsPlayed,
     eventsSinceLastPromotion,
-    currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds)),
+    currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds, flags)),
     banner: null,
   }
 }

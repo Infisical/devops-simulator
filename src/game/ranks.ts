@@ -19,3 +19,4 @@ export const PROMOTION_LINES: string[] = [
 
 export const MAX_EVENTS = 22
 export const DISRUPTION_CHANCE = 0.18
+export const EFFECT_MULTIPLIER = 1.6

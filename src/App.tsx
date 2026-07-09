@@ -3,9 +3,10 @@ import { newGame, resolveChoice, currentRankTitle, type GameState } from './game
 import StatsBar from './components/StatsBar'
 import EventCard from './components/EventCard'
 import ResultPanel from './components/ResultPanel'
+import Promotion from './components/Promotion'
 import EndScreen from './components/EndScreen'
 
-type Phase = 'intro' | 'event' | 'result' | 'ended'
+type Phase = 'intro' | 'event' | 'result' | 'promotion' | 'ended'
 
 function App() {
   const [game, setGame] = useState<GameState | null>(null)
@@ -24,6 +25,10 @@ function App() {
   }
 
   function continueAfterResult() {
+    setPhase(game?.banner ? 'promotion' : 'event')
+  }
+
+  function continueAfterPromotion() {
     setPhase('event')
   }
 
@@ -34,6 +39,7 @@ function App() {
 
   return (
     <div className="terminal-shell">
+      <div className="scanlines" />
       <div className="title-bar">
         <span>DEVOPS SIMULATOR</span>
         <span className="title-bar-sub">presented by Infisical</span>
@@ -63,18 +69,22 @@ function App() {
 
       {game && phase === 'event' && (
         <>
-          <StatsBar stats={game.stats} />
+          <StatsBar stats={game.stats} deltas={game.lastDeltas} />
           <div className="rank-line">rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}</div>
-          <EventCard event={game.currentEvent} banner={game.banner} onChoose={choose} />
+          <EventCard key={game.currentEvent.id} event={game.currentEvent} onChoose={choose} />
         </>
       )}
 
       {game && phase === 'result' && (
         <>
-          <StatsBar stats={game.stats} />
+          <StatsBar stats={game.stats} deltas={game.lastDeltas} />
           <div className="rank-line">rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}</div>
           <ResultPanel text={game.lastChoiceResult ?? ''} onContinue={continueAfterResult} />
         </>
+      )}
+
+      {game && phase === 'promotion' && game.banner && (
+        <Promotion text={game.banner} onContinue={continueAfterPromotion} />
       )}
 
       {game && phase === 'ended' && game.ending && (

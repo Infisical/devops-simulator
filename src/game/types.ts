@@ -12,9 +12,11 @@ export interface GameEvent {
   id: string
   minRank: number
   maxRank?: number
-  tag?: 'security' | 'disruption' | 'exit'
+  tag?: 'security' | 'disruption' | 'exit' | 'nemesis'
   log: string
   choices: Choice[]
+  requiresFlag?: string
+  setFlag?: string
 }
 
 export interface RankInfo {
