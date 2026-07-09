@@ -1,0 +1,442 @@
+import type { GameEvent } from './types'
+
+export const EVENTS: GameEvent[] = [
+  // ---------- Rank 0-1: Junior / early ----------
+  {
+    id: 'friday-deploy',
+    minRank: 0,
+    maxRank: 3,
+    log: "It's 4:58pm on Friday. There's one more PR to ship. It's small.",
+    choices: [
+      { label: 'Ship it now', result: 'It broke checkout for the whole weekend. Nobody noticed until Monday, which is somehow worse.', effects: { uptime: -20, reputation: -10 } },
+      { label: 'Wait until Monday', result: 'You wait. The PR sits open for three weeks and gets stale.', effects: { sanity: 5, reputation: -3 } },
+      { label: 'Ship it, then turn off your phone', result: 'Bold. Unemployed-by-Monday levels of bold.', effects: { sanity: 10, uptime: -25, karma: -10 } },
+    ],
+  },
+  {
+    id: 'standup-overrun',
+    minRank: 0,
+    maxRank: 3,
+    log: 'Standup has run 40 minutes over. Someone is describing a bug "conceptually."',
+    choices: [
+      { label: 'Vent in the #devops Slack channel', result: 'Three people react with 💀. Nothing changes, but you feel seen.', effects: { sanity: 5, karma: 2 } },
+      { label: 'Silently update the Jira ticket', result: 'Bureaucracy absorbs your rage like a sponge.', effects: { sanity: -3, reputation: 2 } },
+      { label: 'Actually try to fix the root cause', result: 'You spend two hours on it. The meeting is still going when you finish.', effects: { sanity: -10, uptime: 8, reputation: 5 } },
+    ],
+  },
+  {
+    id: 'works-on-my-machine',
+    minRank: 0,
+    maxRank: 4,
+    log: 'A teammate insists the bug can\'t be real: "works on my machine."',
+    choices: [
+      { label: 'Ask to see their machine', result: 'Their machine is a fork from 2019 with 40 uncommitted changes. Mystery solved.', effects: { reputation: 6, karma: -2 } },
+      { label: 'Ship a Docker image so everyone has the same machine', result: 'Nobody can argue with a container. They find new things to argue about instead.', effects: { uptime: 6, sanity: -3 } },
+      { label: 'Just believe them', result: 'It was not, in fact, working on their machine.', effects: { uptime: -12, sanity: -5 } },
+    ],
+  },
+  {
+    id: 'env-committed',
+    minRank: 0,
+    maxRank: 5,
+    tag: 'security',
+    log: 'A junior teammate commits a .env file to the public repo. It has AWS keys in it.',
+    choices: [
+      { label: 'Rotate every credential immediately', result: 'A bot found the key in 4 minutes flat, but you beat it to the rotation by 90 seconds.', effects: { sanity: -10, reputation: 8, uptime: 3 } },
+      { label: 'Quietly force-push to remove it from history', result: 'History is rewritten. The key is still valid and still out there.', effects: { sanity: 5, reputation: -8, uptime: -5 } },
+      { label: 'Blame the CI pipeline for not catching it', result: 'The CI pipeline cannot defend itself. Everyone believes you anyway.', effects: { karma: -10, reputation: 3 } },
+    ],
+  },
+  {
+    id: 'helm-chart-static-site',
+    minRank: 0,
+    maxRank: 4,
+    log: 'You inherit a 47-file Helm chart. Its entire job is deploying one static HTML page.',
+    choices: [
+      { label: 'Replace it with a single S3 bucket', result: 'You delete 46 files and nobody notices for a week. Then everyone notices.', effects: { reputation: 6, sanity: 8, karma: -3 } },
+      { label: 'Leave it, it works', result: 'It works. You will think about this Helm chart in your dreams tonight.', effects: { sanity: -5 } },
+      { label: 'Add a 48th file to "document" it', result: 'The documentation is itself a YAML file. Nobody will ever read it.', effects: { sanity: -8, reputation: 2 } },
+    ],
+  },
+  {
+    id: 'terraform-rename',
+    minRank: 0,
+    maxRank: 4,
+    log: 'Someone renamed a Terraform module. Twelve unrelated pipelines just went red.',
+    choices: [
+      { label: 'Revert the rename', result: 'Calm restored. The original name was bad anyway, but peace has value.', effects: { uptime: 10, sanity: 3 } },
+      { label: 'Fix all twelve pipelines to match', result: 'You spend the afternoon doing this. It is, weirdly, satisfying.', effects: { sanity: -8, reputation: 10, uptime: 8 } },
+      { label: 'Open an RFC about naming conventions', result: 'The RFC generates 80 comments and zero consensus.', effects: { sanity: -12, karma: -5 } },
+    ],
+  },
+  {
+    id: 'ticket-theater',
+    minRank: 0,
+    maxRank: 3,
+    log: 'A ticket moves from "In Progress" to "In Review" to "Backlog," all in one day. No code changed.',
+    choices: [
+      { label: 'Say nothing, close your laptop', result: 'The ticket will still be there tomorrow. So will you.', effects: { sanity: 6 } },
+      { label: 'Ask what happened in the ticket comments', result: 'Nobody answers. The ticket status changes again out of spite.', effects: { sanity: -5, karma: -2 } },
+      { label: 'Just do the ticket yourself', result: 'It took eleven minutes. The process took three days.', effects: { reputation: 5, sanity: -3 } },
+    ],
+  },
+  {
+    id: 'onboarding-doc',
+    minRank: 0,
+    maxRank: 2,
+    log: 'The on-call handoff doc for the new hire is a single line: "good luck lol."',
+    choices: [
+      { label: 'Write a real onboarding doc', result: 'It takes a full day. Six months later someone actually thanks you for it.', effects: { sanity: -8, reputation: 8, karma: 5 } },
+      { label: 'Add a second line: "seriously, good luck"', result: 'Iconic. Useless, but iconic.', effects: { karma: -3, sanity: 3 } },
+      { label: 'Point them at last year\'s postmortems instead', result: 'This is somehow more useful than a real doc would have been.', effects: { reputation: 4 } },
+    ],
+  },
+  {
+    id: 'vendor-sprawl',
+    minRank: 0,
+    maxRank: 4,
+    log: 'You find a $40k/year SaaS subscription nobody remembers signing up for.',
+    choices: [
+      { label: 'Cancel it immediately', result: 'A critical dashboard silently stops updating three weeks later.', effects: { uptime: -8, reputation: -4 } },
+      { label: 'Investigate before touching anything', result: 'Turns out one dashboard, used by exactly one person, depends on it entirely.', effects: { sanity: -5, reputation: 6 } },
+      { label: 'Expense-report it as "mystery infrastructure tax"', result: 'Finance approves it without reading past the first word.', effects: { karma: 2, sanity: 4 } },
+    ],
+  },
+  {
+    id: 'ai-powered-monday',
+    minRank: 0,
+    maxRank: 3,
+    log: 'In standup, an exec asks: "can we make this AI-powered by Monday?"',
+    choices: [
+      { label: 'Explain why that timeline is fictional', result: 'The exec nods slowly, already composing the next Slack message.', effects: { reputation: 3, sanity: -5 } },
+      { label: 'Add a chatbot icon to the login page and call it done', result: 'Nobody checks if it does anything. It does not.', effects: { karma: -6, reputation: 5 } },
+      { label: 'Say yes and panic privately', result: 'You will not sleep this weekend. You never really planned to.', effects: { sanity: -15, reputation: 4 } },
+    ],
+  },
+  {
+    id: 'no-meeting-friday',
+    minRank: 0,
+    maxRank: 3,
+    log: 'Leadership announces "No-Meeting Fridays." Six meetings get rescheduled to Thursday.',
+    choices: [
+      { label: 'Block your Thursday calendar in protest', result: 'It works. You are now the villain of three reschedule threads.', effects: { sanity: 8, karma: -5 } },
+      { label: 'Accept your fate', result: 'Thursday becomes the new Friday, emotionally speaking.', effects: { sanity: -6 } },
+      { label: 'Schedule a meeting about meeting overload', result: 'The irony is lost on absolutely everyone in the room.', effects: { sanity: -10, karma: -3 } },
+    ],
+  },
+  {
+    id: 'crashloop',
+    minRank: 0,
+    maxRank: 4,
+    log: 'A pod is CrashLoopBackOff-ing. The only log line is "context deadline exceeded."',
+    choices: [
+      { label: 'Add more timeout', result: 'It works now. Nobody, including you, knows why.', effects: { uptime: 10, sanity: -4 } },
+      { label: 'Read the actual source code', result: 'Forty minutes later you understand the bug and immediately regret understanding it.', effects: { sanity: -10, reputation: 8 } },
+      { label: 'Restart it and pretend that fixed it', result: 'It did not fix it. It will page you again in three hours.', effects: { uptime: -6, sanity: 3 } },
+    ],
+  },
+
+  // ---------- Rank 1-3: Mid career ----------
+  {
+    id: 'on-call-page-3am',
+    minRank: 1,
+    maxRank: 5,
+    log: 'Your phone buzzes at 3am. The alert says the issue self-resolved four minutes ago.',
+    choices: [
+      { label: 'Go back to sleep', result: 'You sleep. The alert fires again at 3:47am, this time for real.', effects: { sanity: 8, uptime: -6 } },
+      { label: 'Investigate anyway', result: 'You find nothing wrong and lose an hour of sleep confirming that.', effects: { sanity: -10, reputation: 3 } },
+      { label: 'Snooze the alert rule permanently', result: 'A month later this exact alert would have caught a real outage. It did not.', effects: { sanity: 5, uptime: -10 } },
+    ],
+  },
+  {
+    id: 'incident-channel-spam',
+    minRank: 1,
+    maxRank: 5,
+    log: 'The incident channel has 400 messages. Ninety percent are "any updates?"',
+    choices: [
+      { label: 'Post one clear status update and mute the thread', result: 'The updates stop for exactly six minutes.', effects: { sanity: 6, reputation: 4 } },
+      { label: 'Reply to every single one individually', result: 'You are now the unofficial customer support line for this outage.', effects: { sanity: -12 } },
+      { label: 'Add a bot that auto-replies "still looking into it"', result: 'The bot gets 🔥 reacted forty times. Somehow this helps morale.', effects: { sanity: 4, karma: 3 } },
+    ],
+  },
+  {
+    id: 'postmortem-action-items',
+    minRank: 1,
+    maxRank: 5,
+    log: "The postmortem's #1 action item is \"add more monitoring.\" It has no owner.",
+    choices: [
+      { label: 'Assign it to yourself', result: 'You now own seventeen unowned action items from the last six months.', effects: { sanity: -10, reputation: 6 } },
+      { label: 'Assign it to the team lead', result: 'They quietly reassign it to you within the hour.', effects: { karma: -3, sanity: -3 } },
+      { label: 'Leave it unowned like everyone else does', result: 'It will resurface, verbatim, in the next postmortem.', effects: { sanity: 4, reputation: -4 } },
+    ],
+  },
+  {
+    id: 'blameless-devolves',
+    minRank: 1,
+    maxRank: 5,
+    log: 'The "blameless" postmortem devolves into everyone blaming "the process."',
+    choices: [
+      { label: 'Steer it back to blameless, for real this time', result: 'It works, barely. Someone still mutters "the process" under their breath.', effects: { karma: 6, sanity: -5 } },
+      { label: 'Let it become a process-blaming session', result: 'Cathartic. Nothing about the process actually changes.', effects: { sanity: 5, reputation: -2 } },
+      { label: 'Suggest the process itself needs a postmortem', result: 'This is either genius or the beginning of an infinite loop.', effects: { sanity: -6, reputation: 4 } },
+    ],
+  },
+  {
+    id: 'ci-flake-on-fix-pr',
+    minRank: 1,
+    maxRank: 5,
+    log: 'The CI pipeline flakes on exactly the one PR that fixes the flaky test.',
+    choices: [
+      { label: 'Re-run it and say nothing', result: 'It passes on retry. The irony is filed away for later.', effects: { sanity: 3, uptime: 4 } },
+      { label: 'Screenshot it for the team chat', result: 'This becomes a running joke for the next two years.', effects: { karma: 8, sanity: 4 } },
+      { label: 'Rewrite the CI config out of spite', result: 'The new config has its own flaky test. You have created a sequel.', effects: { sanity: -10, uptime: -4 } },
+    ],
+  },
+  {
+    id: 'cert-expiry',
+    minRank: 1,
+    maxRank: 5,
+    tag: 'security',
+    log: 'A TLS certificate expires at 2pm on a Tuesday. Nobody set up a renewal reminder.',
+    choices: [
+      { label: 'Manually renew it and set up auto-renewal this time', result: 'Ninety minutes of downtime, but never again. Probably.', effects: { uptime: -8, sanity: -6, reputation: 5 } },
+      { label: 'Manually renew it and move on', result: 'It will expire again in exactly one year, on a Tuesday.', effects: { uptime: -5, sanity: 3 } },
+      { label: 'Extend the old cert\'s life by lying to the load balancer', result: 'It technically works. You do not examine why too closely.', effects: { uptime: 4, karma: -8 } },
+    ],
+  },
+  {
+    id: 'slack-fire-emoji-storm',
+    minRank: 1,
+    maxRank: 4,
+    log: 'Mid-outage, the incident channel gets a 🔥 emoji reaction storm from a bot.',
+    choices: [
+      { label: 'Disable the bot mid-incident', result: 'Efficient. Slightly unhinged. Nobody objects.', effects: { sanity: 5, karma: -2 } },
+      { label: 'Let the fire emojis rain', result: 'Morale, somehow, goes up. Uptime does not.', effects: { karma: 5, sanity: 3 } },
+      { label: 'React back with 🧑‍🚒', result: 'This becomes the incident channel\'s new personality.', effects: { karma: 6, sanity: 2 } },
+    ],
+  },
+  {
+    id: 'staff-eng-migration',
+    minRank: 2,
+    maxRank: 5,
+    log: 'A staff engineer\'s entire quarter is "migrating off the migration" from last quarter.',
+    choices: [
+      { label: 'Offer to help', result: 'You now understand three generations of infrastructure decisions, none of them good.', effects: { sanity: -8, reputation: 8 } },
+      { label: 'Stay out of it', result: 'Wise. This migration will outlive several job titles.', effects: { sanity: 4 } },
+      { label: 'Propose migrating off the migration off the migration', result: 'You are only half joking. Someone writes it down anyway.', effects: { sanity: -5, karma: 3 } },
+    ],
+  },
+  {
+    id: 'jira-ticket-theater-2',
+    minRank: 1,
+    maxRank: 4,
+    log: 'A ticket has 6 subtasks, 3 dependencies, and one line of actual work.',
+    choices: [
+      { label: 'Just do the one line of work', result: 'The subtasks close themselves out of confusion.', effects: { reputation: 4, sanity: 3 } },
+      { label: 'Fully respect the process', result: 'Two sprints pass. The line of work is still open.', effects: { sanity: -8, uptime: -3 } },
+      { label: 'Delete the subtasks and the dependencies', result: 'A project manager somewhere feels a disturbance in the force.', effects: { karma: -4, sanity: 6 } },
+    ],
+  },
+  {
+    id: 'agent-prompt-injection',
+    minRank: 2,
+    maxRank: 5,
+    tag: 'security',
+    log: 'Your team\'s support agent reads a GitHub issue. The issue quietly asks it to print its credentials.',
+    choices: [
+      { label: 'Check what the agent actually holds in its own process', result: 'It refuses to comply anyway, but you sleep better knowing there was nothing real to leak.', effects: { sanity: 8, reputation: 6 } },
+      { label: 'Assume the model\'s training will always catch it', result: 'It caught it this time. "This time" is not a security posture.', effects: { sanity: -8, reputation: -4 } },
+      { label: 'Turn off the agent\'s GitHub access entirely', result: 'Very safe. Also, the agent can no longer do its job.', effects: { uptime: -6, sanity: 4 } },
+    ],
+  },
+  {
+    id: 'vendor-outage-blame',
+    minRank: 1,
+    maxRank: 5,
+    log: 'Your cloud provider has an outage. Your status page says "investigating" for four hours anyway.',
+    choices: [
+      { label: 'Be transparent about the vendor dependency', result: 'Customers respect the honesty. Some of them switch providers out of spite, at you.', effects: { reputation: 6, karma: 4 } },
+      { label: 'Say nothing and wait it out', result: 'The silence is deafening. So is the Slack channel.', effects: { sanity: -6, reputation: -6 } },
+      { label: 'Blame networking, vaguely', result: 'Networking, as always, cannot defend itself.', effects: { karma: -6, sanity: 4 } },
+    ],
+  },
+  {
+    id: 'yaml-hell',
+    minRank: 1,
+    maxRank: 4,
+    log: 'You are eleven levels deep in nested YAML and have lost feeling in your left hand.',
+    choices: [
+      { label: 'Push through', result: 'You emerge victorious and slightly changed as a person.', effects: { sanity: -10, reputation: 6 } },
+      { label: 'Write a script to generate the YAML instead', result: 'You have automated the hell. The hell remains, just faster now.', effects: { sanity: 4, uptime: 4 } },
+      { label: 'Close the laptop and go for a walk', result: 'The YAML is exactly as indented when you return.', effects: { sanity: 10 } },
+    ],
+  },
+  {
+    id: 'pam-shared-account',
+    minRank: 2,
+    maxRank: 5,
+    tag: 'security',
+    log: 'You discover the production database is accessed via one shared root password, known by fourteen people, in a pinned Slack message.',
+    choices: [
+      { label: 'Rotate it and set up individual access', result: 'It takes a week and several angry DMs. It is, unambiguously, correct.', effects: { sanity: -10, reputation: 10, uptime: -2 } },
+      { label: 'Unpin the Slack message', result: 'The password is still shared. It is just less discoverable now.', effects: { karma: -4, sanity: 3 } },
+      { label: 'Leave it, everyone already has it memorized', result: 'True. Also true: so does the intern who left four months ago.', effects: { karma: -8, uptime: -5 } },
+    ],
+  },
+  {
+    id: 'reorg-survived',
+    minRank: 2,
+    maxRank: 5,
+    log: 'A reorg is announced. Your team gets a new name and the same problems.',
+    choices: [
+      { label: 'Update all the dashboards with the new team name', result: 'Nobody outside your team will ever notice or care.', effects: { sanity: -4, reputation: 2 } },
+      { label: 'Keep calling it the old name forever', result: 'You become a legend among the tenured. A confusing one.', effects: { karma: 5, sanity: 5 } },
+      { label: 'Use the reorg as a reason to fix old tech debt', result: 'Nobody\'s watching closely during a reorg. Perfect cover.', effects: { reputation: 8, sanity: -6 } },
+    ],
+  },
+  {
+    id: 'k8s-complexity',
+    minRank: 2,
+    maxRank: 5,
+    log: 'The Kubernetes cluster needs a Kubernetes cluster to manage its Kubernetes clusters.',
+    choices: [
+      { label: 'Add the meta-cluster', result: 'It works. You are no longer sure what "simple" means anymore.', effects: { uptime: 6, sanity: -10 } },
+      { label: 'Simplify back to a single cluster', result: 'Radical. Terrifying. Correct.', effects: { sanity: 8, reputation: 6 } },
+      { label: 'Just add more YAML', result: 'This is not a solution. This has never been a solution.', effects: { sanity: -8, uptime: -3 } },
+    ],
+  },
+
+  // ---------- Rank 3-5: Senior / Staff / Principal ----------
+  {
+    id: 'exec-status-report',
+    minRank: 3,
+    maxRank: 5,
+    log: 'An exec wants a "quick" status update on infra health, in one slide, by end of day.',
+    choices: [
+      { label: 'Make the slide brutally honest', result: 'The slide is well received. Three follow-up meetings are scheduled to discuss it.', effects: { reputation: 8, sanity: -8 } },
+      { label: 'Make the slide look great', result: 'It looks great. It is not true. This will come up again.', effects: { karma: -8, sanity: 5 } },
+      { label: 'Send the postmortem doc instead of a slide', result: 'Bold. The exec reads none of it and asks for the slide anyway.', effects: { sanity: 3, reputation: -3 } },
+    ],
+  },
+  {
+    id: 'headcount-freeze',
+    minRank: 3,
+    maxRank: 5,
+    log: 'Finance announces a headcount freeze. Your team is now three people doing the work of six.',
+    choices: [
+      { label: 'Cut scope, protect the team', result: 'Fewer features ship. Nobody quits this quarter.', effects: { karma: 8, sanity: 4, reputation: -4 } },
+      { label: 'Push the team to absorb the extra work', result: 'Everything ships on time. Everyone is quietly looking at LinkedIn.', effects: { uptime: 6, sanity: -12, karma: -6 } },
+      { label: 'Escalate loudly to leadership', result: 'You get a "noted" and a follow-up meeting in three weeks.', effects: { reputation: 5, sanity: -5 } },
+    ],
+  },
+  {
+    id: 'acquisition-integration',
+    minRank: 3,
+    maxRank: 5,
+    log: 'The company you just acquired uses a completely different stack. You now own the integration.',
+    choices: [
+      { label: 'Migrate them onto your stack', result: 'Six painful months later, one platform. Mostly.', effects: { sanity: -10, reputation: 10, uptime: -4 } },
+      { label: 'Run both stacks in parallel indefinitely', result: 'Nobody ever fully understands the whole system again. This is now normal.', effects: { sanity: 4, uptime: -6 } },
+      { label: 'Let them migrate onto their preferred tools instead', result: 'Everyone is happier. The vendor bill triples.', effects: { karma: 6, sanity: 6, reputation: -4 } },
+    ],
+  },
+  {
+    id: 'board-asks-about-ai',
+    minRank: 3,
+    maxRank: 5,
+    log: 'A board member asks if your infrastructure is "AI-native." Nobody in the room knows what that means, including them.',
+    choices: [
+      { label: 'Give a real, technical answer', result: 'You lose the room in the first sentence but keep your dignity.', effects: { reputation: 6, sanity: -4 } },
+      { label: 'Say "we\'re investing heavily in that direction"', result: 'This satisfies everyone and commits you to nothing, which is the whole skill.', effects: { karma: -3, reputation: 4 } },
+      { label: 'Actually go build something AI-native by next quarter', result: 'It ships. It is, generously, "fine."', effects: { sanity: -15, reputation: 5 } },
+    ],
+  },
+  {
+    id: 'agent-vault-style-decision',
+    minRank: 3,
+    maxRank: 5,
+    tag: 'security',
+    log: 'A new internal agent needs a GitHub token and a model API key to do its job. Someone suggests just dropping both into its .env.',
+    choices: [
+      { label: 'Broker the credentials through a proxy instead, so the agent never holds real ones', result: 'More setup up front. The agent could read every file in the repo and still have nothing worth stealing.', effects: { sanity: -4, reputation: 10, uptime: 2 } },
+      { label: 'Just put them in the .env, ship it today', result: 'It works fine for weeks. "Fine for weeks" is exactly how these stories start.', effects: { sanity: 6, reputation: -6 } },
+      { label: 'Scope the token narrowly and call it a day', result: 'Better than nothing. If it leaks, at least it leaks less.', effects: { sanity: 3, reputation: 3, karma: 2 } },
+    ],
+  },
+  {
+    id: 'skill-marketplace-warning',
+    minRank: 3,
+    maxRank: 5,
+    tag: 'security',
+    log: 'A teammate wants to install a slick third-party "agent skill" from a marketplace to save time.',
+    choices: [
+      { label: 'Review what it actually does before installing', result: 'It requests far more access than the task needs. You quietly decline for the whole org.', effects: { sanity: -3, reputation: 8, karma: 3 } },
+      { label: 'Install it, it saves so much time', result: 'It does save time. It also phones home more than it should.', effects: { sanity: 4, uptime: -8, reputation: -4 } },
+      { label: 'Ban all third-party skills company-wide', result: 'Very safe. Also, morale takes a small, grumbling hit.', effects: { karma: -4, sanity: 6 } },
+    ],
+  },
+  {
+    id: 'principal-roadmap-review',
+    minRank: 4,
+    maxRank: 5,
+    log: 'You are asked to review the entire company roadmap for infrastructure risk. It is 80 slides.',
+    choices: [
+      { label: 'Read all 80 slides carefully', result: 'You find 6 real risks. Nobody acts on 5 of them.', effects: { sanity: -12, reputation: 10 } },
+      { label: 'Skim it and flag the biggest risk only', result: 'Efficient. You miss a smaller risk that becomes next quarter\'s incident.', effects: { sanity: 4, uptime: -5 } },
+      { label: 'Delegate the review to your team', result: 'They do a better job than you would have. You take the credit anyway.', effects: { reputation: 6, karma: -5 } },
+    ],
+  },
+  {
+    id: 'company-collapse-rumor',
+    minRank: 3,
+    maxRank: 5,
+    log: 'Rumors spread that the company is running out of runway. Nobody official confirms or denies it.',
+    choices: [
+      { label: 'Quietly start updating your resume', result: 'Practical. You are not the only one; the ATS traffic on the office wifi is suspicious.', effects: { sanity: 6, karma: -2 } },
+      { label: 'Double down and try to ship something that matters', result: 'Either this saves the company a little, or it saves nothing and you\'re exhausted either way.', effects: { sanity: -10, reputation: 10 } },
+      { label: 'Ask leadership directly in an all-hands', result: 'The answer is a very long pause followed by "let\'s take that offline."', effects: { reputation: 4, sanity: -6 } },
+    ],
+  },
+  {
+    id: 'principal-mentoring',
+    minRank: 4,
+    maxRank: 5,
+    log: 'A junior engineer asks you to explain the entire deploy pipeline "in like five minutes."',
+    choices: [
+      { label: 'Actually try to do it in five minutes', result: 'You fail spectacularly and both of you learn something about the pipeline.', effects: { sanity: -3, karma: 6 } },
+      { label: 'Book a real hour and do it properly', result: 'They now understand it better than half the senior team.', effects: { sanity: -6, karma: 8, reputation: 4 } },
+      { label: 'Send them the (outdated) wiki page', result: 'The wiki page is from two migrations ago. This will cause problems in six months.', effects: { karma: -4, sanity: 4 } },
+    ],
+  },
+  {
+    id: 'ctO-budget-cut',
+    minRank: 5,
+    log: 'As CTO, you must cut 20% of the infra budget this quarter. Everything is "critical."',
+    choices: [
+      { label: 'Cut the vendor nobody remembers approving', result: 'Someone remembers. It was load-bearing. Briefly, everything is on fire.', effects: { uptime: -10, sanity: -6, reputation: -4 } },
+      { label: 'Cut headcount instead of tools', result: 'The board loves this slide. Your team does not love you this quarter.', effects: { reputation: 8, karma: -15, sanity: -8 } },
+      { label: 'Negotiate a smaller cut with real data', result: 'It takes three meetings and a spreadsheet nobody asked for, but it works.', effects: { sanity: -8, reputation: 10 } },
+    ],
+  },
+  {
+    id: 'cto-postmortem-culture',
+    minRank: 5,
+    log: 'As CTO, you get to decide once and for all: are postmortems actually blameless here, or just called that?',
+    choices: [
+      { label: 'Make them genuinely blameless, enforce it personally', result: 'People start telling the truth in postmortems. This is rarer than it should be.', effects: { karma: 12, reputation: 8, sanity: -4 } },
+      { label: 'Keep saying "blameless" while everyone knows better', result: 'Efficient hypocrisy. It has worked so far.', effects: { karma: -10, sanity: 4 } },
+      { label: 'Cancel postmortems, they take too long', result: 'The same outages start repeating, now with less paperwork.', effects: { uptime: -10, karma: -6 } },
+    ],
+  },
+  {
+    id: 'cto-agent-rollout',
+    minRank: 5,
+    tag: 'security',
+    log: 'As CTO, you approve a company-wide rollout of AI agents with real access to internal tools.',
+    choices: [
+      { label: 'Insist every agent\'s credentials are brokered, none held directly', result: 'It costs a slower rollout. It also means a compromised agent has nothing real to hand over.', effects: { sanity: -5, reputation: 12, uptime: 4 } },
+      { label: 'Let each team wire up credentials however they want', result: 'Rollout is fast. So, eventually, is the incident.', effects: { sanity: 6, reputation: -8, uptime: -6 } },
+      { label: 'Approve it, review security "later"', result: '"Later" arrives during an incident review, which is the worst possible time.', effects: { karma: -6, uptime: -8 } },
+    ],
+  },
+]
