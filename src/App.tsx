@@ -58,6 +58,11 @@ function App() {
             Keep production up. Keep your sanity up. Keep your job.
             <br />
             Survive long enough and your stock options might actually be worth something.
+            <br />
+            <br />
+            $ sudo rm -rf ./doubts
+            <br />
+            Permission granted. Good luck.
           </p>
           <div className="choices">
             <button className="choice-btn" onClick={start}>

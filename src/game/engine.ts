@@ -21,28 +21,28 @@ export interface GameState {
 const INITIAL_STATS: Stats = { sanity: 50, uptime: 50, reputation: 50, karma: 50 }
 
 const FIRED_REASONS: Record<keyof Stats, string> = {
-  sanity: 'You quietly closed your laptop, walked outside, and never came back. HR calls it "resignation." You call it "surviving."',
-  uptime: 'Production went down one time too many. Your manager used the word "accountability" seven times in one meeting.',
-  reputation: 'Nobody trusts your PRs, your postmortems, or your standup updates anymore. You are let go "to pursue other opportunities."',
-  karma: 'Enough people complained about you in enough 1:1s. It finally caught up with you.',
+  sanity: 'You stood up mid-standup, said "I quit" out loud to a room that thought it was a joke, and walked outside. You did not come back for your stapler. HR calls it "resignation." You call it "Tuesday."',
+  uptime: 'Production went down one time too many. Your manager used the word "accountability" seven times in one meeting, twice as a verb.',
+  reputation: 'Nobody trusts your PRs, your postmortems, or your standup updates anymore. You are let go "to pursue other opportunities," a phrase that has never once described an actual opportunity.',
+  karma: 'Enough people complained about you in enough 1:1s that HR built you your own recurring calendar event. It finally caught up with you.',
 }
 
 export const STAT_CONTEXT: Record<keyof Stats, { critical: string; strained: string }> = {
   sanity: {
-    strained: 'You are one bad standup away from crying in a supply closet.',
-    critical: 'You have started narrating your own life in the third person. Not a good sign.',
+    strained: 'You are one bad standup away from crying in the supply closet, and everyone knows which supply closet.',
+    critical: 'You have started narrating your own life in the third person, out loud, in meetings. People are starting to schedule around it.',
   },
   uptime: {
-    strained: 'Customers are starting to notice. So is the status page.',
-    critical: 'The outage has its own Slack channel, its own bot, and its own inside jokes.',
+    strained: 'Customers are starting to notice. So is the status page, which now has its own fanbase.',
+    critical: 'The outage has its own Slack channel, its own bot, its own inside jokes, and better attendance than your last all-hands.',
   },
   reputation: {
-    strained: 'People are reviewing your PRs "when they get a chance."',
-    critical: 'Your name is now a verb, and not the good kind.',
+    strained: 'People are reviewing your PRs "when they get a chance," which is corporate for "never."',
+    critical: 'Your name is now a verb. Not the good kind. As in, "don\'t pull a [you]."',
   },
   karma: {
-    strained: 'Two people have started a shared doc about you. You have not seen it.',
-    critical: 'HR has your name saved as a contact.',
+    strained: 'Two people have started a shared doc about you. You have not seen it. You do not want to.',
+    critical: 'HR has your name saved as a contact with a little flag emoji next to it.',
   },
 }
 
@@ -141,7 +141,7 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       ending: {
         kind: 'retired',
         headline: 'EARLY RETIREMENT',
-        reason: `You cashed out. Peak title: ${currentRankTitle(state.rankIndex)}.`,
+        reason: `You cashed out. Peak title: ${currentRankTitle(state.rankIndex)}. Somewhere, a migration ticket reopens itself in your honor.`,
       },
     }
   }
@@ -184,12 +184,12 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
         ? {
             kind: 'forced-good',
             headline: 'QUIETLY PROMOTED INTO IRRELEVANCE',
-            reason: 'You got so good at your job that leadership moved you into a strategic role with no responsibilities. This is, functionally, retirement.',
+            reason: 'You got so good at your job that leadership moved you into a "strategic advisory role" with no direct reports, no responsibilities, and a calendar that is mysteriously always free. This is, functionally, retirement with a badge.',
           }
         : {
             kind: 'forced-bad',
             headline: 'LAID OFF IN THE NEXT ROUND OF CUTS',
-            reason: 'You survived every incident but not the org chart. "Restructuring," they called it.',
+            reason: 'You survived every incident, every 3am page, every migration that wouldn\'t die — and lost to a slide in a deck you never saw, in a meeting you weren\'t invited to. "Restructuring," they called it, in an email sent at 4:58pm on a Friday.',
           },
     }
   }

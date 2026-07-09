@@ -10,11 +10,11 @@ export const RANKS: RankInfo[] = [
 ]
 
 export const PROMOTION_LINES: string[] = [
-  "You've been promoted to DevOps Engineer. The pager still finds you, now with a raise attached.",
-  "You've been promoted to Senior DevOps Engineer. People start asking your opinion in meetings, against your will.",
-  "You've been promoted to Staff Engineer. You now attend meetings about meetings.",
-  "You've been promoted to Principal Engineer. Your job is now 40% Slack, 40% politics, 20% actual engineering.",
-  "You've been promoted to CTO. Congratulations, you are now responsible for everything and blamed for slightly more.",
+  "You've been promoted to DevOps Engineer. The pager still finds you, now with a raise attached and a LinkedIn post you didn't ask for.",
+  "You've been promoted to Senior DevOps Engineer. People start asking your opinion in meetings, against your will, and quoting it back to you incorrectly.",
+  "You've been promoted to Staff Engineer. You now attend meetings about meetings, and occasionally a meeting about whether this meeting should exist.",
+  "You've been promoted to Principal Engineer. Your job is now 40% Slack, 40% politics, 15% actual engineering, and 5% pretending the first two don't count.",
+  "You've been promoted to CTO. Congratulations, you are now responsible for everything and blamed for slightly more than that.",
 ]
 
 export const MAX_EVENTS = 22
