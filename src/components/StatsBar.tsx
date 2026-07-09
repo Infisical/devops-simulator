@@ -5,8 +5,15 @@ import { STAT_CONTEXT } from '../game/engine'
 const LABELS: Record<keyof Stats, string> = {
   sanity: 'SANITY',
   uptime: 'UPTIME',
-  reputation: 'REPUTATION',
+  reputation: 'REP',
   karma: 'KARMA',
+}
+
+const ICONS: Record<keyof Stats, string> = {
+  sanity: '◈',
+  uptime: '▣',
+  reputation: '★',
+  karma: '☯',
 }
 
 interface Props {
@@ -54,6 +61,7 @@ export default function StatsBar({ stats, deltas }: Props) {
         const delta = visibleDeltas[key]
         return (
           <div className="stat-row" key={key}>
+            <span className="stat-icon">{ICONS[key]}</span>
             <span className="stat-label">{LABELS[key]}</span>
             <span className="bar-track">
               <span

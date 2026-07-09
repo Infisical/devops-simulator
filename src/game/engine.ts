@@ -2,7 +2,25 @@ import type { Ending, GameEvent, Stats } from './types'
 import { EVENTS } from './events'
 import { DISRUPTION_EVENTS, EXIT_EVENTS } from './disruptions'
 import { NEMESIS_EVENTS } from './nemesis'
-import { RANKS, PROMOTION_LINES, MAX_EVENTS, DISRUPTION_CHANCE, EFFECT_MULTIPLIER } from './ranks'
+import {
+  RANKS,
+  PROMOTION_LINES,
+  MAX_EVENTS,
+  DISRUPTION_CHANCE,
+  EFFECT_MULTIPLIER,
+  PIP_TRIGGER_THRESHOLD,
+  PIP_RECOVER_THRESHOLD,
+  PIP_WINDOW_EVENTS,
+  PIP_EFFECT_MULTIPLIER,
+  MIN_EVENTS_BEFORE_PIP,
+} from './ranks'
+
+const PIP_FLAG = 'on-pip'
+
+export interface PipNotice {
+  kind: 'pip-start' | 'pip-lifted'
+  text: string
+}
 
 export interface GameState {
   stats: Stats
@@ -13,6 +31,8 @@ export interface GameState {
   flags: string[]
   currentEvent: GameEvent
   banner: string | null
+  notice: PipNotice | null
+  pipWindowRemaining: number | null
   ending: Ending | null
   lastChoiceResult: string | null
   lastDeltas: Partial<Stats>
@@ -25,6 +45,23 @@ const FIRED_REASONS: Record<keyof Stats, string> = {
   uptime: 'Production went down one time too many. Your manager used the word "accountability" seven times in one meeting, twice as a verb.',
   reputation: 'Nobody trusts your PRs, your postmortems, or your standup updates anymore. You are let go "to pursue other opportunities," a phrase that has never once described an actual opportunity.',
   karma: 'Enough people complained about you in enough 1:1s that HR built you your own recurring calendar event. It finally caught up with you.',
+}
+
+const FIRED_REASONS_ON_PIP: Partial<Record<keyof Stats, string>> = {
+  uptime: 'The PIP said "demonstrate reliability." Production went down twice more during the review window. The paperwork was already half-filled-out; you just supplied the last data point.',
+  reputation: 'The PIP said "rebuild trust with the team." Instead your PRs kept getting quietly reassigned. The exit meeting was scheduled before you even sat down for it.',
+}
+
+const PIP_START_TEXT =
+  'Your manager schedules a "quick sync." It is not quick. It is not really a sync. You are placed on a Performance Improvement Plan, effective immediately. From now on, every shift, incident, and ticket counts for a lot more — in both directions.'
+
+const PIP_LIFTED_TEXT =
+  'Your manager says "we\'re really proud of the growth here," in a tone that suggests the sentence was pre-approved by legal. The Performance Improvement Plan is lifted. You are, for now, still employed.'
+
+const PIP_FAILED_ENDING: Ending = {
+  kind: 'fired',
+  headline: 'PERFORMANCE IMPROVEMENT PLAN: FAILED',
+  reason: 'The PIP improved nothing, least of all your performance review. The exit paperwork was ready before the meeting even started, printed on the good printer, the one that never jams.',
 }
 
 export const STAT_CONTEXT: Record<keyof Stats, { critical: string; strained: string }> = {
@@ -50,13 +87,19 @@ function clamp(n: number): number {
   return Math.max(0, Math.min(100, n))
 }
 
-function scaledEffects(effects: Partial<Stats>): Partial<Stats> {
+function scaledEffects(effects: Partial<Stats>, multiplier: number): Partial<Stats> {
   const scaled: Partial<Stats> = {}
   for (const key of Object.keys(effects) as (keyof Stats)[]) {
     const v = effects[key]
-    if (v !== undefined) scaled[key] = Math.round(v * EFFECT_MULTIPLIER)
+    if (v !== undefined) scaled[key] = Math.round(v * multiplier)
   }
   return scaled
+}
+
+// Disruption (company-wide news) and exit (career-decision) events are outside
+// the employee's day-to-day performance, so the PIP microscope doesn't apply to them.
+function isPipAmplified(event: GameEvent): boolean {
+  return event.tag !== 'disruption' && event.tag !== 'exit'
 }
 
 function applyEffects(stats: Stats, effects: Partial<Stats>): Stats {
@@ -119,6 +162,8 @@ export function newGame(): GameState {
     flags: [],
     currentEvent: pickFrom(eligiblePool(0, [], [])),
     banner: null,
+    notice: null,
+    pipWindowRemaining: null,
     ending: null,
     lastChoiceResult: null,
     lastDeltas: {},
@@ -146,10 +191,12 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     }
   }
 
-  const effects = scaledEffects(choice.effects)
+  const wasOnPip = state.flags.includes(PIP_FLAG)
+  const multiplier = EFFECT_MULTIPLIER * (wasOnPip && isPipAmplified(state.currentEvent) ? PIP_EFFECT_MULTIPLIER : 1)
+  const effects = scaledEffects(choice.effects, multiplier)
   const newStats = applyEffects(state.stats, effects)
   const usedIds = [...state.usedEventIds, state.currentEvent.id]
-  const flags = withFlag(state.flags, state.currentEvent)
+  const eventFlags = withFlag(state.flags, state.currentEvent)
   const eventsPlayed = state.eventsPlayed + 1
 
   const firedStat = findFiredStat(newStats)
@@ -160,12 +207,13 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       lastDeltas: effects,
       stats: newStats,
       usedEventIds: usedIds,
-      flags,
+      flags: eventFlags,
       eventsPlayed,
+      notice: null,
       ending: {
         kind: 'fired',
         headline: 'YOU HAVE BEEN FIRED',
-        reason: FIRED_REASONS[firedStat],
+        reason: (wasOnPip && FIRED_REASONS_ON_PIP[firedStat]) || FIRED_REASONS[firedStat],
       },
     }
   }
@@ -178,8 +226,9 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       lastDeltas: effects,
       stats: newStats,
       usedEventIds: usedIds,
-      flags,
+      flags: eventFlags,
       eventsPlayed,
+      notice: null,
       ending: good
         ? {
             kind: 'forced-good',
@@ -194,10 +243,49 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     }
   }
 
+  // PIP state machine: enter when reputation or uptime craters, exit on recovery,
+  // fail the whole game if the window closes without recovery.
+  let flags = eventFlags
+  let notice: PipNotice | null = null
+  let pipWindowRemaining = state.pipWindowRemaining
+
+  if (wasOnPip) {
+    const remaining = (state.pipWindowRemaining ?? PIP_WINDOW_EVENTS) - 1
+    const recovered = newStats.reputation > PIP_RECOVER_THRESHOLD && newStats.uptime > PIP_RECOVER_THRESHOLD
+    if (recovered) {
+      flags = flags.filter((f) => f !== PIP_FLAG)
+      pipWindowRemaining = null
+      notice = { kind: 'pip-lifted', text: PIP_LIFTED_TEXT }
+    } else if (remaining <= 0) {
+      return {
+        ...state,
+        lastChoiceResult: choice.result,
+        lastDeltas: effects,
+        stats: newStats,
+        usedEventIds: usedIds,
+        flags,
+        eventsPlayed,
+        pipWindowRemaining: 0,
+        notice: null,
+        ending: PIP_FAILED_ENDING,
+      }
+    } else {
+      pipWindowRemaining = remaining
+    }
+  } else if (
+    eventsPlayed >= MIN_EVENTS_BEFORE_PIP &&
+    (newStats.reputation <= PIP_TRIGGER_THRESHOLD || newStats.uptime <= PIP_TRIGGER_THRESHOLD)
+  ) {
+    flags = [...flags, PIP_FLAG]
+    pipWindowRemaining = PIP_WINDOW_EVENTS
+    notice = { kind: 'pip-start', text: PIP_START_TEXT }
+  }
+
+  const stillOnPip = flags.includes(PIP_FLAG)
   const eventsSinceLastPromotion = state.eventsSinceLastPromotion + 1
   const rankInfo = RANKS[state.rankIndex]
 
-  if (eventsSinceLastPromotion >= rankInfo.eventsToPromote) {
+  if (eventsSinceLastPromotion >= rankInfo.eventsToPromote && !stillOnPip) {
     if (state.rankIndex === RANKS.length - 1) {
       const exitChance = Math.max(0.12, Math.min(0.75, 0.15 + (avgStat(newStats) - 50) / 100 * 0.5))
       if (Math.random() < exitChance) {
@@ -213,6 +301,8 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
           eventsSinceLastPromotion: 0,
           currentEvent: pickFrom(exits),
           banner: null,
+          notice,
+          pipWindowRemaining,
         }
       }
       return {
@@ -226,6 +316,8 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
         eventsSinceLastPromotion: 0,
         currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds, flags)),
         banner: null,
+        notice,
+        pipWindowRemaining,
       }
     }
 
@@ -242,6 +334,8 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
         eventsSinceLastPromotion: 0,
         currentEvent: pickFrom(disruptions),
         banner: null,
+        notice,
+        pipWindowRemaining,
       }
     }
 
@@ -258,6 +352,8 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
       eventsSinceLastPromotion: 0,
       currentEvent: pickFrom(eligiblePool(newRankIndex, usedIds, flags)),
       banner: PROMOTION_LINES[newRankIndex - 1] ?? null,
+      notice,
+      pipWindowRemaining,
     }
   }
 
@@ -272,5 +368,7 @@ export function resolveChoice(state: GameState, choiceIndex: number): GameState 
     eventsSinceLastPromotion,
     currentEvent: pickFrom(eligiblePool(state.rankIndex, usedIds, flags)),
     banner: null,
+    notice,
+    pipWindowRemaining,
   }
 }

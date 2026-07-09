@@ -20,3 +20,12 @@ export const PROMOTION_LINES: string[] = [
 export const MAX_EVENTS = 22
 export const DISRUPTION_CHANCE = 0.18
 export const EFFECT_MULTIPLIER = 1.6
+
+// PIP: triggered when reputation or uptime craters. While active, work-related
+// event effects (regular shifts, security incidents, the nemesis ticket) hit harder
+// in both directions — everything you do is under a microscope.
+export const PIP_TRIGGER_THRESHOLD = 30
+export const PIP_RECOVER_THRESHOLD = 45
+export const PIP_WINDOW_EVENTS = 6
+export const PIP_EFFECT_MULTIPLIER = 1.5
+export const MIN_EVENTS_BEFORE_PIP = 3

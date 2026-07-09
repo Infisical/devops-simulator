@@ -4,9 +4,10 @@ import StatsBar from './components/StatsBar'
 import EventCard from './components/EventCard'
 import ResultPanel from './components/ResultPanel'
 import Promotion from './components/Promotion'
+import PipNotice from './components/PipNotice'
 import EndScreen from './components/EndScreen'
 
-type Phase = 'intro' | 'event' | 'result' | 'promotion' | 'ended'
+type Phase = 'intro' | 'event' | 'result' | 'notice' | 'promotion' | 'ended'
 
 function App() {
   const [game, setGame] = useState<GameState | null>(null)
@@ -25,6 +26,12 @@ function App() {
   }
 
   function continueAfterResult() {
+    if (game?.notice) setPhase('notice')
+    else if (game?.banner) setPhase('promotion')
+    else setPhase('event')
+  }
+
+  function continueAfterNotice() {
     setPhase(game?.banner ? 'promotion' : 'event')
   }
 
@@ -38,7 +45,8 @@ function App() {
   }
 
   return (
-    <div className="terminal-shell">
+    <div className="terminal-shell pixel-clip">
+      <div className="terminal-inner pixel-clip">
       <div className="scanlines" />
       <div className="title-bar">
         <span>DEVOPS SIMULATOR</span>
@@ -75,7 +83,12 @@ function App() {
       {game && phase === 'event' && (
         <>
           <StatsBar stats={game.stats} deltas={game.lastDeltas} />
-          <div className="rank-line">rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}</div>
+          <div className="rank-line">
+            rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}
+            {game.pipWindowRemaining !== null && (
+              <span className="pip-indicator"> · ON PIP ({game.pipWindowRemaining} left)</span>
+            )}
+          </div>
           <EventCard key={game.currentEvent.id} event={game.currentEvent} onChoose={choose} />
         </>
       )}
@@ -83,9 +96,18 @@ function App() {
       {game && phase === 'result' && (
         <>
           <StatsBar stats={game.stats} deltas={game.lastDeltas} />
-          <div className="rank-line">rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}</div>
+          <div className="rank-line">
+            rank: {currentRankTitle(game.rankIndex)} · day {game.eventsPlayed + 1}
+            {game.pipWindowRemaining !== null && (
+              <span className="pip-indicator"> · ON PIP ({game.pipWindowRemaining} left)</span>
+            )}
+          </div>
           <ResultPanel text={game.lastChoiceResult ?? ''} onContinue={continueAfterResult} />
         </>
+      )}
+
+      {game && phase === 'notice' && game.notice && (
+        <PipNotice notice={game.notice} onContinue={continueAfterNotice} />
       )}
 
       {game && phase === 'promotion' && game.banner && (
@@ -103,6 +125,7 @@ function App() {
       )}
 
       <div className="footer">devops-simulator · presented by Infisical</div>
+      </div>
     </div>
   )
 }
