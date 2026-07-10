@@ -102,7 +102,7 @@ function App() {
               <span className="pip-indicator"> · ON PIP ({game.pipWindowRemaining} left)</span>
             )}
           </div>
-          <ResultPanel text={game.lastChoiceResult ?? ''} onContinue={continueAfterResult} />
+          <ResultPanel text={game.lastChoiceResult ?? ''} deltas={game.lastDeltas} onContinue={continueAfterResult} />
         </>
       )}
 
