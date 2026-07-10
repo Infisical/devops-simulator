@@ -1,28 +1,21 @@
 import type { Stats } from '../game/types'
+import Scene from '../art/Scene'
+import { sceneForTag, moodForDeltas } from '../art/sceneFor'
 
 interface Props {
   text: string
   deltas?: Partial<Stats>
+  tag?: string
   onContinue: () => void
 }
 
-function outcomeIcon(deltas?: Partial<Stats>): { glyph: string; className: string } {
-  const sum = Object.values(deltas ?? {}).reduce((a: number, b) => a + (b ?? 0), 0)
-  if (sum > 0) return { glyph: '📈', className: 'outcome-up' }
-  if (sum < 0) return { glyph: '📉', className: 'outcome-down' }
-  return { glyph: '➖', className: 'outcome-flat' }
-}
-
-export default function ResultPanel({ text, deltas, onContinue }: Props) {
-  const { glyph, className } = outcomeIcon(deltas)
+export default function ResultPanel({ text, deltas, tag, onContinue }: Props) {
   return (
     <div className="event-card result-panel">
-      <div className={`result-icon ${className}`} aria-hidden="true">
-        {glyph}
-      </div>
+      <Scene scene={sceneForTag(tag)} mood={moodForDeltas(deltas)} />
       <p className="event-log">{text || '...'}</p>
       <button className="choice-btn continue-btn" onClick={onContinue}>
-        [ press any key to continue ]
+        Continue
       </button>
     </div>
   )

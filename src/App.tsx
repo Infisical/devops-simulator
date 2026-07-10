@@ -6,12 +6,14 @@ import ResultPanel from './components/ResultPanel'
 import Promotion from './components/Promotion'
 import PipNotice from './components/PipNotice'
 import EndScreen from './components/EndScreen'
+import Scene from './art/Scene'
 
 type Phase = 'intro' | 'event' | 'result' | 'notice' | 'promotion' | 'ended'
 
 function App() {
   const [game, setGame] = useState<GameState | null>(null)
   const [phase, setPhase] = useState<Phase>('intro')
+  const [lastTag, setLastTag] = useState<string | undefined>(undefined)
 
   function start() {
     setGame(newGame())
@@ -20,6 +22,7 @@ function App() {
 
   function choose(index: number) {
     if (!game) return
+    setLastTag(game.currentEvent.tag)
     const next = resolveChoice(game, index)
     setGame(next)
     setPhase(next.ending ? 'ended' : 'result')
@@ -45,36 +48,22 @@ function App() {
   }
 
   return (
-    <div className="terminal-shell pixel-clip">
-      <div className="terminal-inner pixel-clip">
-      <div className="scanlines" />
+    <div className="game-shell">
       <div className="title-bar">
-        <span>DEVOPS SIMULATOR</span>
+        <span>DevOps Simulator</span>
         <span className="title-bar-sub">presented by Infisical</span>
       </div>
 
       {phase === 'intro' && (
         <div className="event-card">
+          <Scene scene="office" mood="neutral" />
           <p className="event-log">
-            $ whoami
-            <br />
-            junior_devops_engineer
-            <br />
-            <br />
-            $ cat /etc/motd
-            <br />
-            Keep production up. Keep your sanity up. Keep your job.
-            <br />
-            Survive long enough and your stock options might actually be worth something.
-            <br />
-            <br />
-            $ sudo rm -rf ./doubts
-            <br />
-            Permission granted. Good luck.
+            Day one. Keep production up, keep your sanity up, keep your job — and survive long
+            enough that your stock options might actually be worth something.
           </p>
           <div className="choices">
             <button className="choice-btn" onClick={start}>
-              [ start shift ]
+              Start shift
             </button>
           </div>
         </div>
@@ -89,7 +78,7 @@ function App() {
               <span className="pip-indicator"> · ON PIP ({game.pipWindowRemaining} left)</span>
             )}
           </div>
-          <EventCard key={game.currentEvent.id} event={game.currentEvent} onChoose={choose} />
+          <EventCard key={game.currentEvent.id} event={game.currentEvent} stats={game.stats} onChoose={choose} />
         </>
       )}
 
@@ -102,7 +91,7 @@ function App() {
               <span className="pip-indicator"> · ON PIP ({game.pipWindowRemaining} left)</span>
             )}
           </div>
-          <ResultPanel text={game.lastChoiceResult ?? ''} deltas={game.lastDeltas} onContinue={continueAfterResult} />
+          <ResultPanel text={game.lastChoiceResult ?? ''} deltas={game.lastDeltas} tag={lastTag} onContinue={continueAfterResult} />
         </>
       )}
 
@@ -125,7 +114,6 @@ function App() {
       )}
 
       <div className="footer">devops-simulator · presented by Infisical</div>
-      </div>
     </div>
   )
 }

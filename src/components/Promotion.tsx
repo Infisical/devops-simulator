@@ -1,3 +1,5 @@
+import Scene from '../art/Scene'
+
 interface Props {
   text: string
   onContinue: () => void
@@ -6,10 +8,11 @@ interface Props {
 export default function Promotion({ text, onContinue }: Props) {
   return (
     <div className="event-card promotion-card">
-      <div className="promotion-flash">** PERFORMANCE REVIEW COMPLETE **</div>
+      <Scene scene="promotion" mood="happy" />
+      <div className="promotion-flash">Performance review complete</div>
       <p className="event-log promotion-text">{text}</p>
       <button className="choice-btn continue-btn" onClick={onContinue}>
-        [ accept new title ]
+        Accept new title
       </button>
     </div>
   )

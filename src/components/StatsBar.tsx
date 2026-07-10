@@ -10,10 +10,10 @@ const LABELS: Record<keyof Stats, string> = {
 }
 
 const ICONS: Record<keyof Stats, string> = {
-  sanity: '◈',
-  uptime: '▣',
-  reputation: '★',
-  karma: '☯',
+  sanity: '🧠',
+  uptime: '🖥️',
+  reputation: '⭐',
+  karma: '🤝',
 }
 
 interface Props {

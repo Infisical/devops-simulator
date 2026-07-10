@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Ending, Stats } from '../game/types'
 import { currentRankTitle } from '../game/engine'
+import Scene from '../art/Scene'
 
 interface Props {
   ending: Ending
@@ -41,6 +42,7 @@ export default function EndScreen({ ending, stats, rankIndex, eventsPlayed, onRe
 
   return (
     <div className="event-card end-screen">
+      <Scene scene={won ? 'ending-good' : 'ending-bad'} mood={won ? 'happy' : 'sad'} />
       <h1 className={HEADLINE_CLASS[ending.kind]}>{ending.headline}</h1>
       <p className="event-log">{ending.reason}</p>
       <div className="end-stats">
